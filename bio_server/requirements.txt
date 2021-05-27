@@ -1,0 +1,4 @@
+Flask==1.1.4
+flask-restx==0.4.0
+PyJWT==1.7.1
+SQLAlchemy==1.4.15
