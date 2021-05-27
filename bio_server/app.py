@@ -121,13 +121,27 @@ def handle_client(conn):
 		path = f"sensor_uploads/{user_id}"
 		os.makedirs(f"./{path}", exist_ok=True)
 
-		start = time.time()
-		with open(f"./{path}/{filename}", 'wb') as file:
+		print("file:", filename)
+		start = datetime.datetime.utcnow()
+		with open(f"./{path}/{filename}.temp", 'wb') as file:
 			while data != b'':
 				data = conn.recv(512)
 				file.write(data)
+		t_delta = datetime.datetime.utcnow() - start
+		print("recieved in(s):", t_delta.total_seconds())
 
-		print("recv:", time.time() - start)
+		with open(f"./{path}/{filename}.temp", 'rb') as temp:
+			with open(f"./{path}/{filename}", 'w') as file:
+				file.write(f"start: {start}\n")
+
+				data = temp.read(4)
+				to_int = lambda v: int.from_bytes(v, byteorder='big')
+				while len(data) == 4:
+					time, value = to_int(data[:2]), to_int(data[2:])
+					file.write(f"{time}: {value}\n")
+					data = temp.read(4)
+
+		os.remove(f"./{path}/{filename}.temp")
 
 	except (jwt.ExpiredSignatureError, jwt.exceptions.DecodeError) as e:
 		#token expired or invalid

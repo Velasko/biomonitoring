@@ -34,14 +34,16 @@ def stream_data(token):
         adc = ADC(Pin(36))
         adc.atten(ADC.ATTN_11DB)
 
-        start = time.ticks_ms()
         time_delta = lambda: time.ticks_diff(time.ticks_ms(), start)
-        str_for = lambda data: "{}:{}\n".format(*data)
-        for _ in range(10):
-            value = [(time_delta(), adc.read()) for _ in range(1000)]
-            data = "".join(map(str_for, value))
-            stream.write(data.encode())
+        int_byte = lambda data: int.to_bytes(data, 2, 'big')
+        display.write("stream start")
 
+        start = time.ticks_ms()
+        for _ in range(10000):
+            value = adc.read()
+            stream.write(int_byte(time_delta()) + int_byte(value))
+
+        display.write("strm end")
 
 def main():
 #    connect_network()
