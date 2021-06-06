@@ -113,7 +113,7 @@ def handle_client(conn):
 						File.user == user_id,
 						File.filename == filename
 					)
-				)
+				) 
 
 				if query.count() != 1:
 					return
@@ -134,12 +134,17 @@ def handle_client(conn):
 			with open(f"./{path}/{filename}", 'w') as file:
 				file.write(f"start: {start}\n")
 
-				data = temp.read(4)
+
+				time_size = 2
+				value_size = 2
+				pkt_size = time_size + value_size
+
+				data = temp.read(pkt_size)
 				to_int = lambda v: int.from_bytes(v, byteorder='big')
-				while len(data) == 4:
-					time, value = to_int(data[:2]), to_int(data[2:])
+				while len(data) == pkt_size:
+					time, value = to_int(data[:time_size]), to_int(data[time_size:])
 					file.write(f"{time}: {value}\n")
-					data = temp.read(4)
+					data = temp.read(pkt_size)
 
 		os.remove(f"./{path}/{filename}.temp")
 
