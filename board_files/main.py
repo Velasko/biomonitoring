@@ -39,17 +39,21 @@ def data_collector(buffer):
         value_byte = lambda data: int.to_bytes(data, 2, 'big')
         
         await_time = .0005
+        cntr = 0
         while True:
             value = adc.read()
             try:
                 buffer.append(time_byte(time_delta()) + value_byte(value))
             except IndexError:
                 await_time *= 2
-#                print("buffer filled")
-#                print("updating time_delta to:", await_time)
+                cntr = 0
+                print("buffer filled")
+                print("updating time_delta to:", await_time)
             finally:
                 time.sleep(await_time)
-
+                cntr += 1
+                if cntr == 10:
+                    await_time /= 2
     finally:
         _thread.exit()
 
