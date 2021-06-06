@@ -35,29 +35,29 @@ def data_collector(buffer):
         time.sleep(1)
         start = time.ticks_ms()
         time_delta = lambda: time.ticks_diff(time.ticks_ms(), start)
-        int_byte = lambda data: int.to_bytes(data, 2, 'big')
+        time_byte = lambda data: int.to_bytes(data, 3, 'big')
+        value_byte = lambda data: int.to_bytes(data, 2, 'big')
         
         await_time = .0005
         while True:
             value = adc.read()
             try:
-                buffer.append(int_byte(time_delta()) + int_byte(value))
+                buffer.append(time_byte(time_delta()) + value_byte(value))
             except IndexError:
-                continue
                 await_time *= 2
-                print("updating time_delta to:", await_time)
+#                print("buffer filled")
+#                print("updating time_delta to:", await_time)
             finally:
                 time.sleep(await_time)
+
     finally:
-        pass
-#        _thread.interrupt_main()
+        _thread.exit()
 
 def stream_data(token, buffer):
     display.write("Connecting to\napi stream")
     with api.ApiStream("velasko.ddns.net", 8100) as stream:
         display.write("sending token")
         stream.write(token.encode('utf-8'))
-
 
         display.write("stream start")
         while True:
@@ -69,10 +69,11 @@ def stream_data(token, buffer):
         display.write("strm end")
 
 def main():
-    print(dir(_thread))
-#    connect_network()
-
-    token = connect_api()
+    try:
+        token = connect_api()
+    except NameError:
+        connect_network()
+        token = connect_api()
     
     buffer = ucollections.deque((), 50, 1)
     _thread.start_new_thread(data_collector, (buffer,))
