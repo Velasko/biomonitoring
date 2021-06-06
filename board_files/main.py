@@ -44,9 +44,7 @@ def data_collector(buffer):
             try:
                 buffer.append(time_byte(time_delta()) + value_byte(value))
             except IndexError:
-                await_time *= 2
-#                print("buffer filled")
-#                print("updating time_delta to:", await_time)
+                pass
             finally:
                 time.sleep(await_time)
 
