@@ -7,6 +7,8 @@ import time
 import threading
 import random
 
+from matplotlib import pyplot as plt
+
 from flask import Flask
 from flask_restx import Api, Resource, fields
 from flask_restx.model import Model
@@ -135,7 +137,7 @@ def handle_client(conn):
 				file.write(f"start: {start}\n")
 
 
-				time_size = 2
+				time_size = 3
 				value_size = 2
 				pkt_size = time_size + value_size
 
@@ -166,6 +168,34 @@ def file_host(host, port):
 			t.daemon = True
 			t.start()
 
+def analyze(filename):
+	print(f"Analyzing {filename}")
+	with open(f'./sensor_uploads/1/{filename}') as file:
+		lines = file.readlines()
+
+
+	#analyzing times:
+	times = [ int(line.split(':')[0]) for line in lines[1:]]
+	time_deltas = [ time - times[n] for n, time in enumerate(times[1:])]
+	avg = sum(time_deltas)/len(time_deltas)
+	var = sum([ (avg-delta)**2 for delta in time_deltas ]) / len(time_deltas)
+	max_t = max(time_deltas)
+
+
+	print(f'Total data: {len(times) - 1} inputs, throughout {max(times)/1000:.2f} s')
+	#printing results
+	print(f"""
+Time info:
+	avg: {avg:.2f}ms;
+	var: {var:.2f};
+	max: {max_t}ms, with {time_deltas.count(max_t)} time(s) occurance @ {time_deltas.index(max_t) + 1} sample
+	min: {min(time_deltas)}
+""")
+
+	plt.hist(time_deltas)
+	# plt.boxplot(time_deltas)
+	plt.show()
+
 if __name__ == '__main__':
 	import argparse
 
@@ -176,10 +206,11 @@ if __name__ == '__main__':
 	parser.add_argument('--host', default='127.0.0.1', help="defines the host")
 	parser.add_argument('-p', '--port', type=int, default=5000, help="which port to run the application on")
 	parser.add_argument('--no-reload', action='store_false', help="disable flask's reloader")
+	parser.add_argument('--filename', help='File on which to be performed the opration')
 
 	group = parser.add_argument_group("Execution mode").add_mutually_exclusive_group()
 	group.add_argument('-r', '--run', action='store_true', help="runs the full REST application")
-
+	group.add_argument('-a', '--analyze', action='store_true', help="Analyze the given or latest data")
 
 	args = parser.parse_args()
 
@@ -191,5 +222,10 @@ if __name__ == '__main__':
 		t.daemon = True
 		t.start()
 		app.run(host=args.host, debug=args.debug, port=args.port, use_reloader=args.no_reload)
+	elif args.analyze:
+		if args.filename is None:
+			with DBsession as session:
+				filename = session.query(File.filename).order_by(File.time.desc()).first()[0]
+		analyze(filename)
 	else:
 		parser.print_help()
