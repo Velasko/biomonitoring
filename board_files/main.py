@@ -1,4 +1,5 @@
 import display
+import machine
 import ucollections
 import settings
 import time
@@ -27,29 +28,35 @@ def connect_api():
 
     return token
 
-def data_collector(buffer):
-    try:
-        adc = ADC(Pin(36))
-        adc.atten(ADC.ATTN_11DB)
+class DataCollector():
+    def __init__(self, buffer):
+        self.adc = ADC(Pin(36))
+        self.adc.atten(ADC.ATTN_11DB)
 
         time.sleep(1)
         start = time.ticks_ms()
-        time_delta = lambda: time.ticks_diff(time.ticks_ms(), start)
-        time_byte = lambda data: int.to_bytes(data, 3, 'big')
-        value_byte = lambda data: int.to_bytes(data, 2, 'big')
-        
-        await_time = .0005
-        while True:
-            value = adc.read()
-            try:
-                buffer.append(time_byte(time_delta()) + value_byte(value))
-            except IndexError:
-                pass
-            finally:
-                time.sleep(await_time)
+        self.time_delta = lambda: time.ticks_diff(time.ticks_ms(), start)
+        self.time_byte = lambda data: int.to_bytes(data, 3, 'big')
+        self.value_byte = lambda data: int.to_bytes(data, 2, 'big')
 
-    finally:
-        _thread.exit()
+        self.counter = 0
+        self.buffer = buffer
+
+    def __call__(self, n):
+        if self.counter == 0:
+            print("First call")
+        elif self.counter == 50000:
+            return
+        value = self.adc.read()
+        try:
+            self.buffer.append(self.time_byte(self.time_delta()) + self.value_byte(value))
+        except IndexError:
+            pass
+        finally:
+            self.counter += 1
+            if self.counter == 50000:
+                print("finished")
+
 
 def stream_data(token, buffer):
     display.write("Connecting to\napi stream")
@@ -74,7 +81,11 @@ def main():
         token = connect_api()
     
     buffer = ucollections.deque((), 50, 1)
-    _thread.start_new_thread(data_collector, (buffer,))
+    timer = machine.Timer(0)
+    timer.init(period=1,
+               mode=machine.Timer.PERIODIC,
+               callback=DataCollector(buffer)
+               )
     stream_data(token, buffer)
             
 
