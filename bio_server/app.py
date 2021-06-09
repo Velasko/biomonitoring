@@ -129,8 +129,8 @@ def handle_client(conn):
 			while data != b'':
 				data = conn.recv(512)
 				file.write(data)
-		t_delta = datetime.datetime.utcnow() - start
-		print("recieved in(s):", t_delta.total_seconds())
+			t_delta = datetime.datetime.utcnow() - start
+			print("recieved in(s):", t_delta.total_seconds())
 
 		with open(f"./{path}/{filename}.temp", 'rb') as temp:
 			with open(f"./{path}/{filename}", 'w') as file:
@@ -181,19 +181,37 @@ def analyze(filename):
 	var = sum([ (avg-delta)**2 for delta in time_deltas ]) / len(time_deltas)
 	max_t = max(time_deltas)
 
+	zeros = time_deltas.count(0)
+	ones = time_deltas.count(1)
 
-	print(f'Total data: {len(times) - 1} inputs, throughout {max(times)/1000:.2f} s')
+	print(f'Total data: {len(times)} inputs, throughout {max(times)/1000:.2f} s')
 	#printing results
 	print(f"""
 Time info:
-	avg: {avg:.2f}ms;
+	avg: {avg:.2f} ms / {1/avg:.2f} kHz;
 	var: {var:.2f};
-	max: {max_t}ms, with {time_deltas.count(max_t)} time(s) occurance @ {time_deltas.index(max_t) + 1} sample
-	min: {min(time_deltas)}
+	max: {max_t} ms, with {time_deltas.count(max_t)} time(s) occurance @ {time_deltas.index(max_t) + 2} sample
+	min: {min(time_deltas)} ms
+	zeros: {zeros} 
+	ones: {ones}
+	<=1: {(zeros+ones)/len(time_deltas)*100:.2f} %
 """)
 
-	plt.hist(time_deltas)
-	# plt.boxplot(time_deltas)
+	if len(time_deltas) % 4 == 0:
+		d = len(time_deltas)//4
+		q1 = time_deltas[d]
+		q3 = time_deltas[3*d]
+	else:
+		d = len(time_deltas)//4
+		q1 = (time_deltas[d] + time_deltas[d+1])/2
+		q3 = (time_deltas[3*d] + time_deltas[3*d+1])/2
+
+	iqr = (q1 + q3)/2
+	lim = iqr*1.5 + q3
+
+	fig, ax = plt.subplots(1, 2)
+	ax[0].plot([time_deltas.count(e) for e in range(int(lim) +2)], drawstyle='steps') #unefficient
+	ax[1].boxplot(time_deltas)
 	plt.show()
 
 if __name__ == '__main__':
@@ -223,6 +241,7 @@ if __name__ == '__main__':
 		t.start()
 		app.run(host=args.host, debug=args.debug, port=args.port, use_reloader=args.no_reload)
 	elif args.analyze:
+		filename = args.filename
 		if args.filename is None:
 			with DBsession as session:
 				filename = session.query(File.filename).order_by(File.time.desc()).first()[0]
