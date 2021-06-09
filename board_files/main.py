@@ -28,44 +28,43 @@ def connect_api():
 
     return token
 
+
+time_byte = lambda data: int.to_bytes(data, 3, 'big')
+value_byte = lambda data: int.to_bytes(data, 2, 'big')
+
 class DataCollector():
-    def __init__(self, buffer):
+    def __init__(self, buffer, counter=-1):
         self.adc = ADC(Pin(36))
         self.adc.atten(ADC.ATTN_11DB)
 
-        time.sleep(1)
         start = time.ticks_ms()
         self.time_delta = lambda: time.ticks_diff(time.ticks_ms(), start)
-        self.time_byte = lambda data: int.to_bytes(data, 3, 'big')
-        self.value_byte = lambda data: int.to_bytes(data, 2, 'big')
 
-        self.counter = 0
+        self.counter = counter
         self.buffer = buffer
+        self.finished = False
 
-    def __call__(self, n):
-        if self.counter == 0:
-            print("First call")
-        elif self.counter == 50000:
-            return
+    def __call__(self, timer):
         value = self.adc.read()
         try:
-            self.buffer.append(self.time_byte(self.time_delta()) + self.value_byte(value))
+            self.buffer.append(time_byte(self.time_delta()) + value_byte(value))
         except IndexError:
-            pass
+            print('filled buffer @', self.time_delta())
         finally:
-            self.counter += 1
-            if self.counter == 50000:
+            if self.counter == 0:
+                timer.deinit()
                 print("finished")
+                self.finished = True
+            self.counter -= 1
 
-
-def stream_data(token, buffer):
+def stream_data(token, collector, buffer):
     display.write("Connecting to\napi stream")
     with api.ApiStream("velasko.ddns.net", 8100) as stream:
         display.write("sending token")
         stream.write(token.encode('utf-8'))
 
         display.write("stream start")
-        while True:
+        while not collector.finished:
             try:
                 stream.write(b''.join([buffer.popleft() for _ in range(len(buffer))]))
             except IndexError:
@@ -81,13 +80,13 @@ def main():
         token = connect_api()
     
     buffer = ucollections.deque((), 50, 1)
+    collector = DataCollector(buffer)#, counter=10000)
     timer = machine.Timer(0)
     timer.init(period=1,
                mode=machine.Timer.PERIODIC,
-               callback=DataCollector(buffer)
+               callback=collector
                )
-    stream_data(token, buffer)
-            
+    stream_data(token, collector, buffer) 
 
 if __name__ == '__main__':
     main()
